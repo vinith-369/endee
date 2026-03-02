@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hiring Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <meta name="description" content="Resume Shortlisting System using RAG AI">
+</head>
+
+<body>
+    <div class="app-container">
+
+        <header class="header">
+            <div class="logo-area">
+                <div class="pulse-ring"></div>
+                <h1>ENDEE<span class="fw-300">HIRE</span></h1>
+            </div>
+            <p class="subtitle">AI-Powered Resume Evaluation Engine</p>
+        </header>
+
+        <!-- Top Row: Two symmetrical control cards -->
+        <div class="controls-row">
+
+            <div class="card">
+                <h2>1. Ingest Candidates</h2>
+                <p class="card-desc">Parse and embed resumes into the vector space.</p>
+
+                <form id="upload-form">
+                    <div class="input-group">
+                        <label for="collection-name">Collection Name</label>
+                        <input type="text" id="collection-name" value="resume_chunks"
+                            placeholder="e.g. backend_engineers">
+                    </div>
+                    <div class="file-drop-area" id="drop-area">
+                        <span class="file-msg">Drag & drop PDFs/DOCXs here or click to browse</span>
+                        <input type="file" id="resume-files" multiple accept=".pdf,.docx" class="file-input">
+                    </div>
+                    <div id="file-list" class="file-list"></div>
+                    <button type="submit" class="btn primary-btn mt-4" id="upload-btn">
+                        Ingest Resumes
+                    </button>
+                </form>
+                <div id="upload-status" class="status-msg hidden"></div>
+            </div>
+
+            <div class="card">
+                <h2>2. Evaluate Job Description</h2>
+                <p class="card-desc">Run hybrid retrieval and cross-encoder RAG evaluation.</p>
+
+                <form id="evaluate-form">
+                    <div class="input-group">
+                        <label for="jd-text">Job Description</label>
+                        <textarea id="jd-text" rows="4"
+                            placeholder="e.g., Seeking a Senior Backend Engineer with 5+ years of experience in Python, FastAPI, and Postgres..."></textarea>
+                    </div>
+                    <div class="input-group row-group">
+                        <div class="half-width">
+                            <label for="eval-collection">Collection</label>
+                            <select id="eval-collection">
+                                <option value="resume_chunks">Loading...</option>
+                            </select>
+                        </div>
+                        <div class="half-width">
+                            <label for="top-k">Top K</label>
+                            <input type="number" id="top-k" value="3" min="1" max="10">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn primary-btn" id="evaluate-btn">
+                        Run Evaluation
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Full-width Results -->
+        <div class="results-section">
+            <div class="card">
+                <div class="results-header">
+                    <h2>Evaluation Results</h2>
+                    <p class="score-legend">Score = 30% Semantic + 50% Skills + 20% Experience</p>
+                    <div class="loader hidden" id="eval-loader"></div>
+                </div>
+
+                <div id="results-container" class="results-container empty-state">
+                    <div class="empty-icon">⌘</div>
+                    <p>No evaluations run yet. Ingest resumes and submit a job description to see AI rankings.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Template for Result Cards -->
+    <template id="result-card-template">
+        <div class="result-card">
+            <div class="rc-header">
+                <div class="rc-info">
+                    <h3 class="candidate-id">Candidate ID</h3>
+                    <div class="score-breakdown"></div>
+                </div>
+                <div class="score-circle">
+                    <span class="score-val"></span>
+                    <span class="score-label">%</span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

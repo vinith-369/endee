@@ -4,9 +4,6 @@ import re
 from typing import Dict, List, Tuple
 from io import BytesIO
 
-# ==========================================
-# 1. PII Stripping
-# ==========================================
 
 def remove_pii(text: str) -> str:
     """
@@ -23,9 +20,6 @@ def remove_pii(text: str) -> str:
     text = re.sub(r'linkedin\.com/in/[^\s]+', '[LINKEDIN]', text)
     return text
 
-# ==========================================
-# 2. File Parsing
-# ==========================================
 
 def parse_pdf(file_bytes: bytes) -> str:
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -37,10 +31,6 @@ def parse_pdf(file_bytes: bytes) -> str:
 def parse_docx(file_bytes: bytes) -> str:
     doc = docx.Document(BytesIO(file_bytes))
     return "\n".join([para.text for para in doc.paragraphs])
-
-# ==========================================
-# 3. Section Segmentation Logic
-# ==========================================
 
 # Common resume section headers
 SECTION_HEADERS = {
@@ -56,12 +46,11 @@ SECTION_HEADERS = {
 def identify_section(line: str) -> str:
     """Matches a line against known section headers."""
     line_lower = line.strip().lower()
-    if len(line_lower) > 30: # Unlikely to be a header
+    if len(line_lower) > 30: 
         return None
         
     for section, patterns in SECTION_HEADERS.items():
         for pattern in patterns:
-            # We enforce exact matches or matches at the start of a short line
             if re.search(pattern, line_lower):
                 return section
     return None

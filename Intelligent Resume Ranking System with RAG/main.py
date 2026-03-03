@@ -28,9 +28,6 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# In-memory "database" to hold unstructured generic chunk text for BM25 mapping
-# and Candidate Metadata (JSON skills/experience) for Scoring 
-# In production, this would be Postgres/MongoDB/Redis
 ALL_CHUNKS: List[Dict[str, Any]] = []
 CANDIDATE_METADATA: Dict[str, Any] = {}
 
@@ -45,7 +42,6 @@ def load_collection(collection_name: str):
             data = json.load(f)
             ALL_CHUNKS = data.get("chunks", [])
             raw_meta = data.get("metadata", {})
-            # Reconstruct Pydantic objects from saved dicts
             from models import CandidateExtraction
             CANDIDATE_METADATA = {}
             for k, v in raw_meta.items():
@@ -59,7 +55,6 @@ def load_collection(collection_name: str):
 
 def save_collection(collection_name: str):
     path = os.path.join(DATA_DIR, f"{collection_name}.json")
-    # Convert Pydantic objects to dicts for JSON serialization
     serializable_meta = {}
     for k, v in CANDIDATE_METADATA.items():
         if hasattr(v, 'model_dump'):
@@ -88,7 +83,6 @@ async def upload_resumes(
     """
     global ALL_CHUNKS
     
-    # Load existing collection data so we can deduplicate
     load_collection(collection_name)
     
     count = 0
@@ -99,21 +93,17 @@ async def upload_resumes(
         file_bytes = await file.read()
         safe_name = file.filename.replace(" ", "_")
         
-        # Deduplicate: remove any prior entry with the same base filename
         old_ids = [cid for cid in CANDIDATE_METADATA if cid.endswith("_" + safe_name)]
         for old_id in old_ids:
             del CANDIDATE_METADATA[old_id]
             ALL_CHUNKS = [c for c in ALL_CHUNKS if c["resume_id"] != old_id]
             print(f"Replaced existing entry: {old_id}")
         
-        # 1. Parse & Segment
         candidate_sections = process_resume(file_bytes, file.filename)
         candidate_id = str(uuid.uuid4())[:8] + "_" + safe_name
         
-        # 2. Extract Structured Metadata & Vectorize to Endee
         metadata_obj = ingest_resume_document(candidate_id, candidate_sections, collection_name=collection_name)
         
-        # 3. Store in Memory Cache for Lexical Search & Final Eval
         CANDIDATE_METADATA[candidate_id] = metadata_obj
         
         for sec, text in candidate_sections.items():
@@ -191,7 +181,7 @@ async def evaluate_job(req: JobDescriptionRequest):
         metadata = CANDIDATE_METADATA.get(c_id)
         
         if not metadata:
-             continue # Edge case, missing in-memory cache
+             continue 
              
         eval_resp = evaluate_candidate(
              candidate_id=c_id,
@@ -204,11 +194,10 @@ async def evaluate_job(req: JobDescriptionRequest):
         
         final_evaluations.append(eval_resp)
         
-    # Sort the final candidates by the combined Algorithmic/Rerank/Experience score
     final_evaluations.sort(key=lambda x: x.overall_score, reverse=True)
     
     return EvaluationReportResponse(
-        job_description=jd[:200] + "...", # trunked string
+        job_description=jd[:200] + "...", 
         rankings=final_evaluations[:top_k]
     )
 
@@ -219,7 +208,6 @@ def get_collections():
         for f in os.listdir(DATA_DIR):
             if f.endswith(".json"):
                 collections.append(f.replace(".json", ""))
-    # Fallback to default if empty
     if not collections:
         collections = ["resume_chunks"]
     return CollectionResponse(collections=collections)
@@ -232,7 +220,6 @@ def delete_collection(collection_name: str):
     if os.path.exists(path):
         os.remove(path)
         deleted = True
-    # Also try to delete the Endee index
     try:
         requests.post(f"http://localhost:8080/api/v1/index/{collection_name}/delete")
     except:

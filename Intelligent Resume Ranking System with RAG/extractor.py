@@ -13,13 +13,11 @@ def extract_structured_metadata(resume_sections: dict) -> CandidateExtraction:
     Focuses on the generic skills list and parsing the experience timelines.
     """
     
-    # We construct a prompt primarily containing the skills/experience sections
     context_text = ""
     for sec in ["skills", "experience", "education", "general"]:
         if sec in resume_sections:
             context_text += f"\n--- {sec.upper()} ---\n{resume_sections[sec]}\n"
             
-    # Qwen schema instruction
     schema_json = CandidateExtraction.model_json_schema()
     
     prompt = f"""
@@ -55,13 +53,11 @@ def extract_structured_metadata(resume_sections: dict) -> CandidateExtraction:
         
         result_content = response.json()["message"]["content"]
         
-        # Parse text into our Pydantic schema
         parsed_data = json.loads(result_content)
         return CandidateExtraction(**parsed_data)
         
     except Exception as e:
         print(f"Ollama Extraction failed: {e}")
-        # Return empty structured fallback
         return CandidateExtraction(skills=[], experience=[], total_years_experience=0)
 
         
@@ -123,10 +119,9 @@ def ingest_resume_document(resume_id: str, sections: dict, collection_name: str 
     for sec_name, sec_text in sections.items():
         if sec_name in ["general", "skills"]:
             continue
-        if len(sec_text.strip()) > 10: # ensure it's not simply empty
+        if len(sec_text.strip()) > 10: 
             chunks.append({"section": sec_name, "text": sec_text})
             
-    # DEBUG PRINT FOR USER
     print(f"\n{'='*50}")
     print(f"RESUME ID: {resume_id}")
     print(f"EXTRACTED METADATA:\n{metadata_obj.model_dump_json(indent=2)}")
@@ -137,7 +132,6 @@ def ingest_resume_document(resume_id: str, sections: dict, collection_name: str 
         print(f"  Text preview: {preview}...\n")
     print(f"{'='*50}\n")
             
-    # Batch upsert
     upsert_chunks(resume_id, chunks, collection_name=collection_name)
     
     return metadata_obj

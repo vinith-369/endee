@@ -43,8 +43,6 @@ def hybrid_retrieve(query_text: str, all_memory_chunks: List[Dict[str, Any]], to
     """
     # 1. Semantic Search (Endee API)
     semantic_results = search_similar_chunks(query_text, top_k=top_k, collection_name=collection_name)
-    # The Endee results generally contain {"id", "score", "metadata":...}
-    # Let's map scores into our unified tracking format
     
     semantic_dict = {}
     for res in semantic_results:
@@ -60,8 +58,6 @@ def hybrid_retrieve(query_text: str, all_memory_chunks: List[Dict[str, Any]], to
         }
 
     # 2. Lexical Search (BM25)
-    # Since BM25 operates on the entire indexed vocabulary, we pass all chunks we know about
-    # For a purely stateless setup, we might have an Elasticsearch/local cache 
     lexical_results = lexical_search_bm25(query_text, all_memory_chunks, top_k=top_k)
     
     lexical_dict = {}
@@ -80,14 +76,12 @@ def hybrid_retrieve(query_text: str, all_memory_chunks: List[Dict[str, Any]], to
     # 3. Reciprocal Rank Fusion / Score Normalization and merging
     merged_uids = set(semantic_dict.keys()).union(set(lexical_dict.keys()))
     
-    # Gather raw arrays to compute normalizers (BM25 can go quite high, cosine is often [0,1])
     raw_sem = [semantic_dict[k]["semantic_score"] for k in semantic_dict.keys()]
     raw_lex = [lexical_dict[k]["bm25_score"] for k in lexical_dict.keys()]
     
     norm_sem = normalize_scores(raw_sem)
     norm_lex = normalize_scores(raw_lex)
     
-    # Remap normalized scores back
     for k, norm in zip(semantic_dict.keys(), norm_sem):
         semantic_dict[k]["norm_semantic"] = norm
     for k, norm in zip(lexical_dict.keys(), norm_lex):
@@ -96,13 +90,11 @@ def hybrid_retrieve(query_text: str, all_memory_chunks: List[Dict[str, Any]], to
     final_results = []
     
     for uid in merged_uids:
-        # Default empty blocks if it only appeared in one search type
         sem_data = semantic_dict.get(uid, {"norm_semantic": 0.0, "resume_id": "", "text": "", "section": ""})
         lex_data = lexical_dict.get(uid, {"norm_bm25": 0.0, "resume_id": "", "text": "", "section": ""})
         
         combined_score = (sem_data["norm_semantic"] * 0.7) + (lex_data["norm_bm25"] * 0.3)
         
-        # Pull text from whichever found it
         text = sem_data["text"] if sem_data["text"] else lex_data["text"]
         resume_id = sem_data["resume_id"] if sem_data["resume_id"] else lex_data["resume_id"]
         section = sem_data["section"] if sem_data["section"] else lex_data["section"]

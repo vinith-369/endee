@@ -1,10 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 
-# ==========================================
-# 1. API Request / Response Models
-# ==========================================
-
 class JobDescriptionRequest(BaseModel):
     job_description: str = Field(..., description="The raw job description text")
     collection_name: str = Field(default="resume_chunks", description="The repository of resumes to search within")
@@ -24,9 +20,7 @@ class EvaluateResponse(BaseModel):
     evidence_chunks: List[str] = Field(default_factory=list)
 
 
-# ==========================================
-# 2. LLM Extraction Models (Structured Output)
-# ==========================================
+
 
 class ExperienceEntry(BaseModel):
     role: str = Field(default="", description="Job title or role of the candidate")

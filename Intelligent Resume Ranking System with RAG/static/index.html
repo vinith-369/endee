@@ -21,74 +21,85 @@
             <p class="subtitle">AI-Powered Resume Evaluation Engine</p>
         </header>
 
-        <!-- Top Row: Two symmetrical control cards -->
-        <div class="controls-row">
+        <div class="main-layout">
 
-            <div class="card">
-                <h2>1. Ingest Candidates</h2>
-                <p class="card-desc">Parse and embed resumes into the vector space.</p>
+            <!-- LEFT SIDEBAR (1/3) -->
+            <aside class="sidebar">
 
-                <form id="upload-form">
-                    <div class="input-group">
-                        <label for="collection-name">Collection Name</label>
-                        <input type="text" id="collection-name" value="resume_chunks"
-                            placeholder="e.g. backend_engineers">
-                    </div>
-                    <div class="file-drop-area" id="drop-area">
-                        <span class="file-msg">Drag & drop PDFs/DOCXs here or click to browse</span>
-                        <input type="file" id="resume-files" multiple accept=".pdf,.docx" class="file-input">
-                    </div>
-                    <div id="file-list" class="file-list"></div>
-                    <button type="submit" class="btn primary-btn mt-4" id="upload-btn">
-                        Ingest Resumes
-                    </button>
-                </form>
-                <div id="upload-status" class="status-msg hidden"></div>
-            </div>
-
-            <div class="card">
-                <h2>2. Evaluate Job Description</h2>
-                <p class="card-desc">Run hybrid retrieval and cross-encoder RAG evaluation.</p>
-
-                <form id="evaluate-form">
-                    <div class="input-group">
-                        <label for="jd-text">Job Description</label>
-                        <textarea id="jd-text" rows="4"
-                            placeholder="e.g., Seeking a Senior Backend Engineer with 5+ years of experience in Python, FastAPI, and Postgres..."></textarea>
-                    </div>
-                    <div class="input-group row-group">
-                        <div class="half-width">
-                            <label for="eval-collection">Collection</label>
-                            <select id="eval-collection">
-                                <option value="resume_chunks">Loading...</option>
-                            </select>
+                <!-- Upload Section -->
+                <div class="sidebar-panel upload-panel">
+                    <h2>Upload Resumes</h2>
+                    <form id="upload-form">
+                        <div class="input-group">
+                            <label for="collection-name">Collection Name</label>
+                            <input type="text" id="collection-name" value="resume_chunks"
+                                placeholder="e.g. backend_engineers">
                         </div>
-                        <div class="half-width">
-                            <label for="top-k">Top K</label>
-                            <input type="number" id="top-k" value="3" min="1" max="10">
+                        <div class="file-drop-area" id="drop-area">
+                            <span class="file-msg">Drag & drop PDFs/DOCXs here or click to browse</span>
+                            <input type="file" id="resume-files" multiple accept=".pdf,.docx" class="file-input">
                         </div>
-                    </div>
-                    <button type="submit" class="btn primary-btn" id="evaluate-btn">
-                        Run Evaluation
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Bottom Row: Full-width Results -->
-        <div class="results-section">
-            <div class="card">
-                <div class="results-header">
-                    <h2>Evaluation Results</h2>
-                    <p class="score-legend">Score = 30% Semantic + 50% Skills + 20% Experience</p>
-                    <div class="loader hidden" id="eval-loader"></div>
+                        <div id="file-list" class="file-list"></div>
+                        <button type="submit" class="btn primary-btn mt-4" id="upload-btn">
+                            Ingest Resumes
+                        </button>
+                    </form>
+                    <div id="upload-status" class="status-msg hidden"></div>
                 </div>
 
-                <div id="results-container" class="results-container empty-state">
-                    <div class="empty-icon">⌘</div>
-                    <p>No evaluations run yet. Ingest resumes and submit a job description to see AI rankings.</p>
+                <!-- Collections Section -->
+                <div class="sidebar-panel collections-panel">
+                    <h2>Collections</h2>
+                    <div id="collections-list" class="collections-list">
+                        <p class="text-muted">Loading...</p>
+                    </div>
                 </div>
-            </div>
+
+            </aside>
+
+            <!-- RIGHT MAIN AREA (2/3) -->
+            <main class="main-content">
+
+                <!-- Top Half: JD + K -->
+                <div class="eval-panel">
+                    <h2>Job Description</h2>
+                    <form id="evaluate-form">
+                        <div class="input-group">
+                            <textarea id="jd-text" rows="4"
+                                placeholder="e.g., Seeking a Senior Backend Engineer with 5+ years of experience in Python, FastAPI, and Postgres..."></textarea>
+                        </div>
+                        <div class="eval-controls">
+                            <div class="input-group compact">
+                                <label for="top-k">Top K</label>
+                                <input type="number" id="top-k" value="3" min="1" max="10">
+                            </div>
+                            <button type="submit" class="btn primary-btn" id="evaluate-btn">
+                                Run Evaluation
+                            </button>
+                        </div>
+                    </form>
+                    <!-- Hidden select for JS to use -->
+                    <input type="hidden" id="eval-collection" value="resume_chunks">
+                </div>
+
+                <!-- Bottom Half: Results -->
+                <div class="results-panel">
+                    <div class="results-header">
+                        <h2>Results</h2>
+                        <div class="results-header-right">
+                            <p class="score-legend">Score = 30% Semantic + 50% Skills + 20% Experience</p>
+                            <div class="loader hidden" id="eval-loader"></div>
+                        </div>
+                    </div>
+
+                    <div id="results-container" class="results-container empty-state">
+                        <div class="empty-icon">⌘</div>
+                        <p>No evaluations run yet. Ingest resumes and submit a job description to see AI rankings.</p>
+                    </div>
+                </div>
+
+            </main>
+
         </div>
 
     </div>
@@ -97,8 +108,9 @@
     <template id="result-card-template">
         <div class="result-card">
             <div class="rc-header">
+                <div class="rc-rank"></div>
                 <div class="rc-info">
-                    <h3 class="candidate-id">Candidate ID</h3>
+                    <h3 class="candidate-id">Candidate</h3>
                     <div class="score-breakdown"></div>
                 </div>
                 <div class="score-circle">

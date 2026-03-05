@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Upload Logic
+    // DOM refs
     const dropArea = document.getElementById('drop-area');
     const fileInput = document.getElementById('resume-files');
     const fileListMsg = document.querySelector('.file-msg');
@@ -8,54 +8,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
     const uploadBtn = document.getElementById('upload-btn');
     const uploadStatus = document.getElementById('upload-status');
-    const evalCollectionSelect = document.getElementById('eval-collection');
+    const collectionsListDiv = document.getElementById('collections-list');
+    const evalCollectionInput = document.getElementById('eval-collection');
 
-    // Load collections on startup
+    let selectedFiles = [];
+    let activeCollection = 'resume_chunks';
+
+    // ─── Collections ───
+
     async function loadCollections() {
         try {
             const res = await fetch('/api/v1/collections');
             const data = await res.json();
-            if (data.collections) {
-                evalCollectionSelect.innerHTML = data.collections.map(c =>
-                    `<option value="${c}">${c}</option>`
-                ).join('');
+            if (data.collections && data.collections.length > 0) {
+                renderCollections(data.collections);
+            } else {
+                collectionsListDiv.innerHTML = '<p class="text-muted">No collections yet</p>';
             }
         } catch (e) {
             console.error("Failed to load collections", e);
-            evalCollectionSelect.innerHTML = `<option value="resume_chunks">resume_chunks</option>`;
+            collectionsListDiv.innerHTML = '<p class="text-muted">Could not load</p>';
         }
+    }
+
+    function renderCollections(collections) {
+        collectionsListDiv.innerHTML = '';
+        collections.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'collection-item' + (name === activeCollection ? ' active' : '');
+            item.innerHTML = `<span>${name}</span><span class="col-check">✓</span>`;
+            item.addEventListener('click', () => selectCollection(name));
+            collectionsListDiv.appendChild(item);
+        });
+    }
+
+    function selectCollection(name) {
+        activeCollection = name;
+        evalCollectionInput.value = name;
+        // Update active state visually
+        document.querySelectorAll('.collection-item').forEach(el => {
+            el.classList.toggle('active', el.querySelector('span').textContent === name);
+        });
     }
 
     loadCollections();
 
-    let selectedFiles = [];
+    // ─── File Upload (Drag & Drop) ───
 
-    // Drag and Drop styling
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+        dropArea.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false);
     });
 
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+    ['dragenter', 'dragover'].forEach(ev => {
+        dropArea.addEventListener(ev, () => dropArea.classList.add('dragover'), false);
     });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+    ['dragleave', 'drop'].forEach(ev => {
+        dropArea.addEventListener(ev, () => dropArea.classList.remove('dragover'), false);
     });
 
-    dropArea.addEventListener('drop', (e) => {
-        let dt = e.dataTransfer;
-        handleFiles(dt.files);
-    });
-
-    fileInput.addEventListener('change', function () {
-        handleFiles(this.files);
-    });
+    dropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+    fileInput.addEventListener('change', function () { handleFiles(this.files); });
 
     function handleFiles(files) {
         selectedFiles = Array.from(files);
@@ -66,12 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedFiles.length > 0) {
             const totalMB = selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
             fileListMsg.textContent = `${selectedFiles.length} file(s) selected`;
-            fileListDiv.innerHTML = `<div class="file-summary">${selectedFiles.length} files &middot; ${totalMB.toFixed(2)} MB total</div>`;
+            fileListDiv.innerHTML = `<div class="file-summary">${selectedFiles.length} files · ${totalMB.toFixed(2)} MB total</div>`;
         } else {
             fileListMsg.textContent = "Drag & drop PDFs/DOCXs here or click to browse";
             fileListDiv.innerHTML = "";
         }
     }
+
+    // ─── Upload Submit ───
 
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -83,15 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('collection_name', collectionName);
         }
 
-        selectedFiles.forEach(file => {
-            formData.append('files', file);
-        });
+        selectedFiles.forEach(file => formData.append('files', file));
 
         uploadBtn.disabled = true;
         uploadBtn.textContent = 'Ingesting...';
         uploadStatus.className = 'status-msg hidden';
 
-        // Show progress bar
         fileListDiv.innerHTML = `
             <div class="upload-progress">
                 <div class="progress-bar"><div class="progress-fill"></div></div>
@@ -110,10 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (response.ok) {
-                uploadStatus.textContent = `Success: Ingested ${data.processed_count} resumes!`;
+                uploadStatus.textContent = `Ingested ${data.processed_count} resumes`;
                 uploadStatus.className = 'status-msg success';
                 selectedFiles = [];
                 updateFileList();
+                // Refresh collections & auto-select the one just uploaded to
+                activeCollection = collectionName || 'resume_chunks';
+                evalCollectionInput.value = activeCollection;
                 loadCollections();
             } else {
                 throw new Error(data.detail || 'Upload failed');
@@ -127,7 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Evaluation Logic
+    // ─── Evaluation ───
+
     const evaluateForm = document.getElementById('evaluate-form');
     const evalBtn = document.getElementById('evaluate-btn');
     const evalLoader = document.getElementById('eval-loader');
@@ -139,7 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const jdText = document.getElementById('jd-text').value.trim();
         const topK = parseInt(document.getElementById('top-k').value, 10);
-        const selectedCollection = evalCollectionSelect.value;
 
         if (!jdText) return;
 
@@ -154,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     job_description: jdText,
-                    collection_name: selectedCollection,
+                    collection_name: activeCollection,
                     top_k: topK
                 })
             });
@@ -169,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             resultsContainer.innerHTML = `
                 <div class="empty-state">
-                    <p style="color:var(--danger)">Error: ${error.message}</p>
+                    <p style="color:#999">Error: ${error.message}</p>
                 </div>
             `;
             resultsContainer.classList.add('empty-state');
@@ -178,6 +193,15 @@ document.addEventListener('DOMContentLoaded', () => {
             evalLoader.classList.add('hidden');
         }
     });
+
+    // ─── Render Results ───
+
+    function stripId(candidateId) {
+        // candidate_id format: "a1b2c3d4_filename.pdf"
+        // Strip everything up to and including the first underscore
+        const idx = candidateId.indexOf('_');
+        return idx !== -1 ? candidateId.substring(idx + 1) : candidateId;
+    }
 
     function renderResults(rankings) {
         if (!rankings || rankings.length === 0) {
@@ -193,16 +217,19 @@ document.addEventListener('DOMContentLoaded', () => {
         rankings.forEach((rank, index) => {
             const clone = template.content.cloneNode(true);
 
-            // Set candidate name
-            clone.querySelector('.candidate-id').textContent = rank.candidate_id;
+            // Rank number
+            clone.querySelector('.rc-rank').textContent = `#${index + 1}`;
 
-            // Format score
+            // Set candidate name — strip UUID prefix, show only filename
+            clone.querySelector('.candidate-id').textContent = stripId(rank.candidate_id);
+
+            // Score
             let scorePercent = Math.round(rank.overall_score * 100);
             if (isNaN(scorePercent)) scorePercent = 0;
             const scoreCircle = clone.querySelector('.score-circle');
             clone.querySelector('.score-val').textContent = `${scorePercent}`;
 
-            // Color grading based on score
+            // Monochrome grading
             if (scorePercent >= 80) {
                 scoreCircle.style.borderColor = '#fff';
                 scoreCircle.style.color = '#fff';
@@ -214,17 +241,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 scoreCircle.style.color = '#888';
             }
 
-            // Score breakdown text
+            // Score breakdown
             const breakdown = clone.querySelector('.score-breakdown');
             if (rank.score_details) {
-                breakdown.textContent = `Sem: ${Math.round(rank.score_details.semantic * 100)}% · Skills: ${Math.round(rank.score_details.skills * 100)}% · Exp: ${Math.round(rank.score_details.experience * 100)}%`;
+                breakdown.textContent = `Sem: ${Math.round(rank.score_details.semantic * 100)}%  ·  Skills: ${Math.round(rank.score_details.skills * 100)}%  ·  Exp: ${Math.round(rank.score_details.experience * 100)}%`;
             } else {
                 breakdown.textContent = `Score: ${scorePercent}%`;
             }
 
             // Stagger animation
-            const targetDiv = clone.querySelector('.result-card');
-            targetDiv.style.animationDelay = `${index * 0.1}s`;
+            clone.querySelector('.result-card').style.animationDelay = `${index * 0.08}s`;
 
             resultsContainer.appendChild(clone);
         });
